@@ -71,26 +71,51 @@ static void encoder_state_write_bitstream_aud(encoder_state_t *const state)
 static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   encoder_state_t *const state)
 {
+  bool is_range_ext = state->encoder_control->chroma_format == KVZ_CSP_400;
   // PTL
   // Profile Tier
   WRITE_U(stream, 0, 2, "general_profile_space");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
-  // Main Profile == 1,  Main 10 profile == 2
-  WRITE_U(stream, (state->encoder_control->bitdepth == 8) ? 1 : 2, 5, "general_profile_idc");
+  // Main Profile == 1,  Main 10 profile == 2, Main_REXT == 4
+  WRITE_U(stream,  is_range_ext ? 4 : (state->encoder_control->bitdepth == 8) ? 1 : 2, 5, "general_profile_idc");
   /* Compatibility flags should be set at general_profile_idc
    *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
    * According to specification, when compatibility_flag[1] is set,
    *  compatibility_flag[2] should be set too.
    */
-  WRITE_U(stream, 3 << 29, 32, "general_profile_compatibility_flag[]");
+  WRITE_U(stream, 3 << 29 | (is_range_ext << 27), 32, "general_profile_compatibility_flag[]");
 
   WRITE_U(stream, 1, 1, "general_progressive_source_flag");
   WRITE_U(stream, state->encoder_control->in.source_scan_type != 0, 1, "general_interlaced_source_flag");
   WRITE_U(stream, 0, 1, "general_non_packed_constraint_flag");
   WRITE_U(stream, 0, 1, "general_frame_only_constraint_flag");
 
-  WRITE_U(stream, 0, 32, "XXX_reserved_zero_44bits[0..31]");
-  WRITE_U(stream, 0, 12, "XXX_reserved_zero_44bits[32..43]");
+  if (is_range_ext)
+  {
+    WRITE_U(stream, state->encoder_control->bitdepth <= 12, 1, "max_12bit_constraint_flag");
+    WRITE_U(stream, state->encoder_control->bitdepth <= 10, 1, "max_10bit_constraint_flag");
+    WRITE_U(stream, state->encoder_control->bitdepth <= 8, 1, "max_8bit_constraint_flag");
+
+
+    WRITE_U(stream, state->encoder_control->chroma_format < KVZ_CSP_444, 1, "max_422chroma_constraint_flag");
+    WRITE_U(stream, state->encoder_control->chroma_format < KVZ_CSP_422, 1, "max_420chroma_constraint_flag");
+    WRITE_U(stream, state->encoder_control->chroma_format < KVZ_CSP_420, 1, "max_400chroma_constraint_flag");
+
+    WRITE_U(stream, 0, 1, "intra_constraint_flag");
+    WRITE_U(stream, 0, 1, "one_picture_only_constraint_flag");
+    WRITE_U(stream, 0, 1, "lower_bit_rate_constraint_flag");
+
+    WRITE_U(stream, 0, 16, "reserved_zero_34bits[0..15]");
+    WRITE_U(stream, 0, 16, "reserved_zero_34bits[16..31]");
+    WRITE_U(stream, 0, 2, "reserved_zero_34bits[32..33]");
+
+    WRITE_U(stream, 0, 1, "inbld_flag");
+  }
+  else
+  {
+    WRITE_U(stream, 0, 32, "XXX_reserved_zero_44bits[0..31]");
+    WRITE_U(stream, 0, 12, "XXX_reserved_zero_44bits[32..43]");
+  }
 
   // end Profile Tier
 
