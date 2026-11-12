@@ -1243,7 +1243,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   int intra_offset = 0;
 
   if (state->encoder_control->cfg.intra_period) {
-    int offset = state->encoder_control->cfg.gop_len - 1;
+    int offset = state->encoder_control->cfg.gop_len > 0 ? state->encoder_control->cfg.gop_len - 1 : 0;
     intra_group = (frame_number + offset) / state->encoder_control->cfg.intra_period;
     intra_offset = (frame_number + offset) % state->encoder_control->cfg.intra_period;
   }
